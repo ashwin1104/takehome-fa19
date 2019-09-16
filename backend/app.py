@@ -2,6 +2,7 @@ from typing import Tuple
 
 from flask import Flask, jsonify, request, Response
 import mockdb.mockdb_interface as db
+import json
 
 app = Flask(__name__)
 
@@ -51,10 +52,6 @@ def mirror(name):
     data = {"name": name}
     return create_response(data)
 
-@app.route("/contacts", methods=['GET'])
-def get_all_contacts():
-    return create_response({"contacts": db.get('contacts')})
-
 @app.route("/shows/<id>", methods=['DELETE'])
 def delete_show(id):
     if db.getById('contacts', int(id)) is None:
@@ -64,7 +61,63 @@ def delete_show(id):
 
 
 # TODO: Implement the rest of the API here!
+@app.route("/contacts/<id>", methods=['GET'])
+def get_contacts_for_id(id):
+    print("I am ashwin" + id)
+    if db.getById('contacts', int(id)) is None:
+        return create_response(status=404, message="No contact with this id exists")
+    # Handle 404. Do db.getById first, check if it's null, if it is do a 404.
+    return create_response({"contacts": db.getById('contacts', int(id))})
 
+@app.route("/contacts", methods=['GET'])
+def get_all_contacts():
+    hobby = request.args.get('hobby')
+    if hobby is None:
+        return create_response({"contacts": db.get('contacts')}) 
+    data = db.getByHobby('contacts', hobby) 
+    if data is None:
+        return create_response(status=404, message="No contact with this hobby exists")
+    return create_response({"contacts": data})
+
+@app.route("/contacts", methods=['POST'])
+def add_contact():
+    contact = json.loads(request.data)
+    count = 0
+    errorMessage = ""
+    if "name" not in contact:
+        count += 1
+        errorMessage += "Name, "
+    
+    if "nickname" not in contact:
+        count += 1
+        errorMessage += " Nickname,"
+    
+    if "hobby" not in contact:
+        count += 1
+        errorMessage += " Hobby,"
+    
+    if count == 0:
+        return create_response(status=201, data={"contacts": db.create('contacts', contact)})
+    else:
+        errorMessage = errorMessage[:-1]
+    return create_response(status=422, message=count + " parameter(s) missing for contact creation. Please include the following missing parameters: " + errorMessage)
+
+@app.route("/contacts/<id>", methods=['PUT'])
+def update_name_hobby_contact(id):
+    update = json.loads(request.data)
+    if db.getById("contacts", int(id)) is None:
+        return create_response(status=404, message="No contact with this id exists")
+
+    count = 0
+    if "name" not in update:
+        count += 1
+    
+    if "hobby" not in update:
+        count += 1
+    
+    if count <= 1:
+        return create_response(status=201, data={"contacts": db.updateById("contacts", int(id), update)})
+    return create_response({"contacts": db.getById('contacts', int(id))})
 """
 ~~~~~~~~~~~~ END API ~~~~~~~~~~~~
 """
